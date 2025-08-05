@@ -1,5 +1,8 @@
+import os
+import datetime
+import sqlite3
 from flask import Flask, render_template, request
-import requests, datetime, sqlite3, os
+import requests
 from urllib.parse import quote
 from collections import defaultdict
 
@@ -21,7 +24,7 @@ CATEGORY_KEYWORDS = {
 DB_PATH = "price_history.db"
 search_counts = defaultdict(int)
 
-# DB 초기화
+
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -36,16 +39,17 @@ def init_db():
     conn.commit()
     conn.close()
 
-# 가격 기록 저장
+
 def save_price_history(title, price):
     date_str = datetime.date.today().strftime("%Y-%m-%d")
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("INSERT INTO price_history (title, date, price) VALUES (?, ?, ?)", (title, date_str, price))
+    c.execute("INSERT INTO price_history (title, date, price) VALUES (?, ?, ?)",
+              (title, date_str, price))
     conn.commit()
     conn.close()
 
-# 제휴 링크 변환
+
 def convert_to_affiliate_link(original_url):
     if LINKPRICE_PARTNER_CODE:
         if "gmarket.co.kr" in original_url:
@@ -54,17 +58,22 @@ def convert_to_affiliate_link(original_url):
             return f"https://click.linkprice.com/click.php?m=11st&a={LINKPRICE_PARTNER_CODE}&l={original_url}"
     return original_url
 
-# 네이버 쇼핑 검색
+
 def search_naver(keyword):
     encoded_keyword = quote(keyword)
-    url = f"https://openapi.naver.com/v1/search/shop.json?query={encoded_keyword}&display=20&sort=asc"
+    # display=10 → 빠른 로딩
+    url = f"https://openapi.naver.com/v1/search/shop.json?query={encoded_keyword}&display=10&sort=asc"
     headers = {
         "X-Naver-Client-Id": NAVER_CLIENT_ID,
         "X-Naver-Client-Secret": NAVER_CLIENT_SECRET
     }
-    res = requests.get(url, headers=headers, timeout=5)
-    if res.status_code != 200:
+    try:
+        res = requests.get(url, headers=headers, timeout=3)
+        if res.status_code != 200:
+            return []
+    except requests.exceptions.RequestException:
         return []
+
     data = res.json()
     results = []
     for item in data.get("items", []):
@@ -84,15 +93,16 @@ def search_naver(keyword):
         })
     return results
 
-# 인기 키워드 병합
+
 def merge_popular_keywords():
     user_keywords = sorted(search_counts.items(), key=lambda x: x[1], reverse=True)[:10]
     user_keywords_list = [kw for kw, _ in user_keywords]
-    base_keywords = ["무선청소기", "에어프라이어", "게이밍의자", "노트북", "선풍기", "캠핑의자", "블루투스이어폰", "스마트워치"]
+    base_keywords = ["무선청소기", "에어프라이어", "게이밍의자", "노트북",
+                     "선풍기", "캠핑의자", "블루투스이어폰", "스마트워치"]
     merged = list(dict.fromkeys(user_keywords_list + base_keywords))
     return merged[:10]
 
-# 카테고리별 핫딜
+
 def get_hotdeals(category=None):
     hotdeals = []
     if category and category in CATEGORY_KEYWORDS:
@@ -103,7 +113,7 @@ def get_hotdeals(category=None):
         hotdeals.extend(search_naver(kw))
     return hotdeals
 
-# 메인 페이지
+
 @app.route("/")
 def index():
     category = request.args.get("category")
@@ -120,7 +130,6 @@ def index():
     start = (page - 1) * per_page
     end = start + per_page
     hotdeals_page = hotdeals[start:end]
-
     top_keywords = merge_popular_keywords()
 
     return render_template(
@@ -134,19 +143,15 @@ def index():
         search_query=query
     )
 
-# 검색 페이지
+
 @app.route("/search")
 def search():
     query = request.args.get("q")
     page = int(request.args.get("page", 1))
     per_page = 12
-
-    if not query:
-        return render_template("search.html", hotdeals=[], search_query="", total_pages=0, current_page=page)
-
     search_counts[query] += 1
-    hotdeals = search_naver(query)
 
+    hotdeals = search_naver(query)
     total_pages = (len(hotdeals) + per_page - 1) // per_page
     start = (page - 1) * per_page
     end = start + per_page
@@ -158,12 +163,12 @@ def search():
     return render_template(
         "search.html",
         hotdeals=hotdeals_page,
-        search_query=query,
+        query=query,
         total_pages=total_pages,
         current_page=page
     )
 
-# 더 보기 API
+
 @app.route("/load-more")
 def load_more():
     category = request.args.get("category")
