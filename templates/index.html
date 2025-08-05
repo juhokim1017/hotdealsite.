@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>오늘의 할인 · 쿠폰 · 핫딜</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+  .zoom-container img { transition: transform 0.3s ease; }
+  .zoom-container:hover img { transform: scale(1.2); }
+  .price { color: red; font-weight: bold; font-size: 1.1rem; }
+  #scrollTopBtn {
+    position: fixed;
+    bottom: 40px;
+    right: 40px;
+    display: none;
+    z-index: 999;
+  }
+</style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container">
+    <a class="navbar-brand" href="/">🔥 오늘의 핫딜</a>
+    <form action="/search" method="get" class="d-flex ms-auto">
+      <input type="text" name="q" class="form-control me-2" placeholder="상품 검색" required>
+      <button class="btn btn-warning" type="submit">검색</button>
+    </form>
+  </div>
+</nav>
+
+<div class="container py-4">
+  <div class="mb-4 text-center">
+    <a href="/" class="btn btn-outline-dark {% if not selected_category %}active{% endif %}">전체</a>
+    {% for cat in categories %}
+    <a href="/?category={{ cat }}" class="btn btn-outline-dark {% if selected_category == cat %}active{% endif %}">{{ cat }}</a>
+    {% endfor %}
+  </div>
+
+  <div class="mb-4 text-center">
+    <h5>🔥 실시간 인기 검색어</h5>
+    <div>
+      {% for keyword in top_keywords %}
+        <a href="/search?q={{ keyword }}" class="badge bg-secondary me-2">{{ loop.index }}위 - {{ keyword }}</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="row" id="product-list">
+    {% include "_product_cards.html" %}
+  </div>
+
+  <div id="loading" class="text-center my-4" style="display:none;">
+    <div class="spinner-border"></div>
+  </div>
+</div>
+
+<button id="scrollTopBtn" class="btn btn-primary">⬆ 맨 위로</button>
+
+<script>
+let currentPage = 1;
+let loading = false;
+let searchQuery = "{{ search_query or '' }}";
+let category = "{{ selected_category or '' }}";
+
+window.addEventListener('scroll', () => {
+  if (loading) return;
+  if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
+    loading = true;
+    document.getElementById('loading').style.display = 'block';
+    currentPage++;
+
+    let url = "";
+    if (searchQuery) {
+      url = `/search?q=${encodeURIComponent(searchQuery)}&page=${currentPage}`;
+    } else {
+      url = `/load-more?page=${currentPage}&category=${encodeURIComponent(category)}`;
+    }
+
+    fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+      .then(res => res.text())
+      .then(html => {
+        document.getElementById('product-list').insertAdjacentHTML('beforeend', html);
+        document.getElementById('loading').style.display = 'none';
+        loading = false;
+      });
+  }
+
+  const scrollTopBtn = document.getElementById("scrollTopBtn");
+  if (document.documentElement.scrollTop > 200) {
+    scrollTopBtn.style.display = "block";
+  } else {
+    scrollTopBtn.style.display = "none";
+  }
+});
+
+document.getElementById("scrollTopBtn").addEventListener("click", () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+</script>
+</body>
+</html>
