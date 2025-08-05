@@ -1,13 +1,11 @@
-{% for deal in hotdeals %}
+{% for hotdeal in hotdeals %}
 <div class="col-md-3 mb-4">
   <div class="card h-100 zoom-container">
-    <a href="{{ deal.link }}" target="_blank">
-      <img src="{{ deal.image }}" class="card-img-top" alt="{{ deal.title }}">
-    </a>
+    <img src="{{ hotdeal.image }}" class="card-img-top" alt="{{ hotdeal.title }}">
     <div class="card-body">
-      <h6 class="card-title">{{ deal.title }}</h6>
-      <p class="mb-1 text-muted" style="font-weight:bold;">{{ deal.desc }}</p>
-      <p class="price">{{ deal.price_text }}</p>
+      <h6 class="card-title">{{ hotdeal.title }}</h6>
+      <p class="price">{{ hotdeal.price }}</p>
+      <a href="{{ hotdeal.link }}" target="_blank" class="btn btn-primary btn-sm">구매하기</a>
     </div>
   </div>
 </div>

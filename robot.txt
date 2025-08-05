@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://hotdealsite-99cs.onrender.com/sitemap.xml
