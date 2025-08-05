@@ -1,8 +1,11 @@
-from flask import Flask, render_template, request
-import requests, datetime, sqlite3
+import os
+import datetime
+import sqlite3
 from urllib.parse import quote
 from collections import defaultdict
-import os
+
+import requests
+from flask import Flask, render_template, request
 
 app = Flask(__name__)
 
@@ -10,9 +13,10 @@ app = Flask(__name__)
 NAVER_CLIENT_ID = "snUgCPwELuh2Gh4S1ifV"
 NAVER_CLIENT_SECRET = "m49FxLN16o"
 
-# LinkPrice 퍼블리셔 파트너 코드
+# LinkPrice 파트너 코드
 LINKPRICE_PARTNER_CODE = "A100698035"
 
+# 카테고리별 키워드
 CATEGORY_KEYWORDS = {
     "편의점": ["편의점 행사", "편의점 1+1", "편의점 할인"],
     "마트": ["이마트 세일", "롯데마트 행사", "홈플러스 할인"],
@@ -30,14 +34,14 @@ search_counts = defaultdict(int)
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute('''
+    c.execute("""
         CREATE TABLE IF NOT EXISTS price_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT,
             date TEXT,
             price INTEGER
         )
-    ''')
+    """)
     conn.commit()
     conn.close()
 
@@ -46,12 +50,15 @@ def save_price_history(title, price):
     date_str = datetime.date.today().strftime("%Y-%m-%d")
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("INSERT INTO price_history (title, date, price) VALUES (?, ?, ?)",
-              (title, date_str, price))
+    c.execute(
+        "INSERT INTO price_history (title, date, price) VALUES (?, ?, ?)",
+        (title, date_str, price)
+    )
     conn.commit()
     conn.close()
 
 
+# 제휴 링크 변환
 def convert_to_affiliate_link(original_url):
     if LINKPRICE_PARTNER_CODE:
         if "gmarket.co.kr" in original_url:
@@ -61,6 +68,7 @@ def convert_to_affiliate_link(original_url):
     return original_url
 
 
+# 네이버 쇼핑 검색
 def search_naver(keyword):
     encoded_keyword = quote(keyword)
     url = f"https://openapi.naver.com/v1/search/shop.json?query={encoded_keyword}&display=20&sort=asc"
@@ -91,6 +99,7 @@ def search_naver(keyword):
     return results
 
 
+# 인기 키워드
 def merge_popular_keywords():
     user_keywords = sorted(search_counts.items(), key=lambda x: x[1], reverse=True)[:10]
     user_keywords_list = [kw for kw, _ in user_keywords]
@@ -99,6 +108,7 @@ def merge_popular_keywords():
     return merged[:10]
 
 
+# 카테고리 핫딜
 def get_hotdeals(category=None):
     hotdeals = []
     if category and category in CATEGORY_KEYWORDS:
@@ -126,7 +136,6 @@ def index():
     start = (page - 1) * per_page
     end = start + per_page
     hotdeals_page = hotdeals[start:end]
-
     top_keywords = merge_popular_keywords()
 
     return render_template(
@@ -139,26 +148,6 @@ def index():
         current_page=page,
         search_query=query
     )
-
-
-# 검색 페이지 라우트 추가
-@app.route("/search")
-def search():
-    query = request.args.get("q")
-    page = int(request.args.get("page", 1))
-    per_page = 12
-
-    if not query:
-        return render_template("search.html", hotdeals=[], query="", total_pages=0, current_page=page)
-
-    hotdeals = search_naver(query)
-    total_pages = (len(hotdeals) + per_page - 1) // per_page
-    start = (page - 1) * per_page
-    end = start + per_page
-    hotdeals_page = hotdeals[start:end]
-
-    return render_template("search.html", hotdeals=hotdeals_page, query=query,
-                           total_pages=total_pages, current_page=page)
 
 
 @app.route("/load-more")
@@ -176,11 +165,10 @@ def load_more():
     start = (page - 1) * per_page
     end = start + per_page
     hotdeals_page = hotdeals[start:end]
-
     return render_template("_product_cards.html", hotdeals=hotdeals_page)
 
 
 if __name__ == "__main__":
     init_db()
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 5000))  # Render 호환
     app.run(host="0.0.0.0", port=port)
